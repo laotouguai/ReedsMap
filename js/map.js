@@ -12,6 +12,7 @@ require([
     "esri/widgets/Locate",
     "esri/geometry/Point",
     "esri/symbols/SimpleMarkerSymbol",
+    "dojo/domReady!"
 ], function (Map,
              Graphic,
              SceneView,
