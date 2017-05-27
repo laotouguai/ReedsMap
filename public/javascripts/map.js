@@ -5,7 +5,6 @@
 require([
     "esri/Map",
     "esri/Graphic",
-    "esri/views/SceneView",
     "esri/views/MapView",
     "esri/layers/TileLayer",
     "esri/layers/GraphicsLayer",
@@ -17,7 +16,6 @@ require([
     "dojo/domReady!"
 ], function (Map,
              Graphic,
-             SceneView,
              MapView,
              TileLayer,
              GraphicsLayer,
@@ -28,10 +26,6 @@ require([
              SimpleFillSymbol) {
 
     var map = new Map();
-    // var view = new SceneView({
-    //     container: "viewDiv",
-    //     map: map
-    // });
     var view = new MapView({
         container: "viewDiv",
         map: map
@@ -42,7 +36,6 @@ require([
     view.ui.add(locateWidget, "top-left");
     var baseLayer = new TileLayer({
         url: "http://cache1.arcgisonline.cn/arcgis/rest/services/ChinaOnlineCommunity/MapServer"    // gcj02
-        // url: "http://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer"
     });
     map.add(baseLayer);
     var locLayer = new GraphicsLayer();
@@ -133,6 +126,28 @@ require([
     }
 
     /**
+     * 百度逆地理编码
+     * @param point bd09坐标，ArcGIS Point
+     * @param callback 回调
+     */
+    function reverseGeocode(point, callback) {
+        var geoc = new BMap.Geocoder();
+        var pt = new BMap.Point();
+        pt.lat = point.latitude;
+        pt.lng = point.longitude;
+        console.dir(pt);
+        geoc.getLocation(pt, function (result) {
+            if (result) {
+                console.info("reverse geocode result:");
+                console.dir(result);
+                callback(result);
+            } else {
+                console.info("reverse geocode no result!");
+            }
+        });
+    }
+    
+    /**
      * 显示位置到地图
      * @param point 点
      * @param accuracy 定位精度
@@ -140,8 +155,9 @@ require([
      */
     function showLocation(point, accuracy, attributes) {
         locLayer.removeAll();
+        // 定位图标
         var locSymbol = new PictureMarkerSymbol({
-            url: "./assets/images/gps_marker.png",
+            url: "/images/gps_marker.png",
             width: 14,
             height: 14
         });
@@ -151,26 +167,26 @@ require([
             attributes: attributes
         });
         locLayer.add(locGraphic);
-        if (accuracy) { // 添加精度圈
-            var waveSymbol = new SimpleFillSymbol({
-                color: [97, 160, 191, 0.05],
-                style: "solid",
-                outline: {
-                    color: [27, 182, 255, 0.48],
-                    width: 1
-                }
-            });
-            var waveCircle = new Circle({
-                center: point,
-                radius: accuracy,
-                geodesic: true      // 避免变形
-            });
-            var waveGraphic = new Graphic({
-                geometry: waveCircle,
-                symbol: waveSymbol
-            });
-            locLayer.add(waveGraphic);
-        }
+        // 精度圈
+        accuracy = accuracy || 1000;    // 默认显示1000
+        var waveSymbol = new SimpleFillSymbol({
+            color: [97, 160, 191, 0.05],
+            style: "solid",
+            outline: {
+                color: [27, 182, 255, 0.48],
+                width: 1
+            }
+        });
+        var waveCircle = new Circle({
+            center: point,
+            radius: accuracy,
+            geodesic: true      // 避免变形
+        });
+        var waveGraphic = new Graphic({
+            geometry: waveCircle,
+            symbol: waveSymbol
+        });
+        locLayer.add(waveGraphic);
         view.goTo({
             target: point,
             zoom: 18
@@ -187,6 +203,13 @@ require([
                 x: event.x,
                 y: event.y
             };
+            var pt = view.toMap(screenPt);
+            var trans = gcj02tobd09(pt.longitude, pt.latitude);
+            pt.longitude = trans[0];
+            pt.latitude = trans[1];
+            reverseGeocode(pt, function (result) {
+                // TODO 显示到Pop // TODO Pop先显示，获取结果后更新内容
+            });
             view.hitTest(screenPt).then(function (response) {
                 if (response.results[0] && response.results[0].graphic) {
                     view.popup.open({
