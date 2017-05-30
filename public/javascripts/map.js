@@ -2,7 +2,7 @@
  * Created by LaoTouGuai on 2017-05-18.
  * Map Display
  */
-require([
+define([
     "esri/Map",
     "esri/Graphic",
     "esri/views/MapView",
@@ -13,6 +13,7 @@ require([
     "esri/geometry/Circle",
     "esri/symbols/PictureMarkerSymbol",
     "esri/symbols/SimpleFillSymbol",
+    "app/transform",
     "dojo/domReady!"
 ], function (Map,
              Graphic,
@@ -23,30 +24,40 @@ require([
              Point,
              Circle,
              PictureMarkerSymbol,
-             SimpleFillSymbol) {
+             SimpleFillSymbol,
+             Trans) {
 
-    var map = new Map();
-    var view = new MapView({
-        container: "viewDiv",
-        map: map
-    });
-    var locateWidget = new Locate({
-        view: view
-    });
-    view.ui.add(locateWidget, "top-left");
-    var baseLayer = new TileLayer({
-        url: "http://cache1.arcgisonline.cn/arcgis/rest/services/ChinaOnlineCommunity/MapServer"    // gcj02
-    });
-    map.add(baseLayer);
-    var locLayer = new GraphicsLayer();
-    map.add(locLayer);
+    var _map;
+    var _view;
+    var _locLayer;
 
-    view.then(function () {
-        // 定位并显示
-        initLocation();
-        // 初始化事件
-        initEvents();
-    });
+    /**
+     * 初始化
+     */
+    function init() {
+        _map = new Map();
+        _view = new MapView({
+            container: "viewDiv",
+            map: _map
+        });
+        var locateWidget = new Locate({
+            view: _view
+        });
+        _view.ui.add(locateWidget, "top-left");
+        var baseLayer = new TileLayer({
+            url: "http://cache1.arcgisonline.cn/arcgis/rest/services/ChinaOnlineCommunity/MapServer"    // gcj02
+        });
+        _map.add(baseLayer);
+        _locLayer = new GraphicsLayer();
+        _map.add(_locLayer);
+
+        _view.then(function () {
+            // 定位并显示
+            initLocation();
+            // 初始化事件
+            initEvents();
+        });
+    }
 
     /**
      * 初始化定位并显示到地图
@@ -81,7 +92,7 @@ require([
                 latitude: result.point.lat,
                 longitude: result.point.lng
             });
-            var trans = bd09togcj02(point.longitude, point.latitude);
+            var trans = Trans.bd09togcj02(point.longitude, point.latitude);
             var transPt = new Point({
                 latitude: trans[1],
                 longitude: trans[0]
@@ -135,7 +146,6 @@ require([
         var pt = new BMap.Point();
         pt.lat = point.latitude;
         pt.lng = point.longitude;
-        console.dir(pt);
         geoc.getLocation(pt, function (result) {
             if (result) {
                 console.info("reverse geocode result:");
@@ -154,7 +164,7 @@ require([
      * @param attributes 定位点属性
      */
     function showLocation(point, accuracy, attributes) {
-        locLayer.removeAll();
+        _locLayer.removeAll();
         // 定位图标
         var locSymbol = new PictureMarkerSymbol({
             url: "/images/gps_marker.png",
@@ -166,7 +176,7 @@ require([
             symbol: locSymbol,
             attributes: attributes
         });
-        locLayer.add(locGraphic);
+        _locLayer.add(locGraphic);
         // 精度圈
         accuracy = accuracy || 1000;    // 默认显示1000
         var waveSymbol = new SimpleFillSymbol({
@@ -186,8 +196,8 @@ require([
             geometry: waveCircle,
             symbol: waveSymbol
         });
-        locLayer.add(waveGraphic);
-        view.goTo({
+        _locLayer.add(waveGraphic);
+        _view.goTo({
             target: point,
             zoom: 18
         });
@@ -197,27 +207,33 @@ require([
      * 初始化地图事件
      */
     function initEvents() {
-        // 指针悬浮
-        view.on("click", function (event) {
+        // 指针点击
+        _view.on("click", function (event) {
             var screenPt = {
                 x: event.x,
                 y: event.y
             };
-            var pt = view.toMap(screenPt);
-            var trans = gcj02tobd09(pt.longitude, pt.latitude);
-            pt.longitude = trans[0];
-            pt.latitude = trans[1];
-            reverseGeocode(pt, function (result) {
-                // TODO 显示到Pop // TODO Pop先显示，获取结果后更新内容
-            });
-            view.hitTest(screenPt).then(function (response) {
-                if (response.results[0] && response.results[0].graphic) {
-                    view.popup.open({
-                        title: "当前位置",
-                        location: response.results[0].mapPoint
-                    });
-                }
+            var pt = _view.toMap(screenPt);
+            var trans = Trans.gcj02tobd09(pt.longitude, pt.latitude);
+            var transPt = {
+                latitude: trans[1],
+                longitude: trans[0]
+            };
+            // 逆地理编码，显示popup
+            reverseGeocode(transPt, function (result) {
+                // 采用iframe加载页面方式，逆地理编码结果通过参数传入 // 若直接将整个页面放入content，则页面中script无法执行
+                var url = "/pop_poi/" + $.toJSON(result);
+                _view.popup.open({   // popup
+                    title: result.title || "位置",
+                    content: "<iframe src='" +url+
+                    "' sandbox='allow-forms allow-popups allow-scripts allow-same-origin allow-modals' scrolling='no' frameborder='0'></iframe>",
+                    location: pt
+                });
             });
         });
     }
+
+    return {
+        init: init
+    };
 });
