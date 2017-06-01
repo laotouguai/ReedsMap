@@ -159,7 +159,7 @@ define([
     
     /**
      * 显示位置到地图
-     * @param point 点
+     * @param point 点 ArcGIS Point
      * @param accuracy 定位精度
      * @param attributes 定位点属性
      */
@@ -221,19 +221,37 @@ define([
             };
             // 逆地理编码，显示popup
             reverseGeocode(transPt, function (result) {
-                // 采用iframe加载页面方式，逆地理编码结果通过参数传入 // 若直接将整个页面放入content，则页面中script无法执行
-                var url = "/pop_poi/" + $.toJSON(result);
-                _view.popup.open({   // popup
-                    title: result.title || "位置",
-                    content: "<iframe src='" +url+
-                    "' sandbox='allow-forms allow-popups allow-scripts allow-same-origin allow-modals' scrolling='no' frameborder='0'></iframe>",
-                    location: pt
-                });
+                showPoiPopup(result, pt);
             });
+        });
+    }
+    
+    function showPoiPopup(address, point) {
+        var title = "位置";
+        var location = point;
+        var url = "/pop_poi/" + $.toJSON(address);
+        if (point) {
+            // TODO 直接显示第一个poi
+
+        }
+
+        if (!point) {    // point不空，显示逆地理编码结果，否则显示结果中poi
+            var trans = Trans.bd09togcj02(address.point.lng, address.point.lat);
+            location = new Point({
+                latitude: trans[1],
+                longitude: trans[0]
+            });
+        }
+        // 采用iframe加载页面，逆地理编码结果通过参数传入 // 若直接将整个页面放入content，则页面中script无法执行
+        _view.popup.open({   // popup
+            title: address.title || "位置",
+            content: "<iframe id='iframe' src='" +url+ "' sandbox='allow-forms allow-popups allow-scripts allow-same-origin allow-modals' scrolling='auto' frameborder='0' width='100%' height='0'></iframe>",
+            location: location
         });
     }
 
     return {
-        init: init
+        init: init,
+        showPoiPopup: showPoiPopup
     };
 });

@@ -5,7 +5,7 @@ require([
 ], function (map) {
     map.init();
 
-    App.show = function (msg) {
-        alert(msg);
-    }
+    App.showPoiPopup = function (poi) {
+        map.showPoiPopup(poi);
+    };
 });
