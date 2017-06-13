@@ -29,7 +29,8 @@ define([
 
     var _map;
     var _view;
-    var _locLayer;
+    var _locLayer;      // 定位点GraphicsLayer
+    var _zoomAction;    // Poopup默认缩放Action
 
     /**
      * 初始化
@@ -56,6 +57,7 @@ define([
             initLocation();
             // 初始化事件
             initEvents();
+            _zoomAction = _view.popup.actions.getItemAt(0);
         });
     }
 
@@ -225,26 +227,69 @@ define([
             });
         });
     }
-    
+
+    /**
+     * 显示Poi列表Popup
+     * @param  address 逆地理编码结果
+     * @param  point  Popup显示点，不空则为第一次列表显示，空则为后续列表项点击显示
+     */
     function showPoiPopup(address, point) {
         var title = "位置";
         var location = point;
-        var url = "/pop_poi/" + $.toJSON(address);
+        var url = "/pop/poi/" + $.toJSON(address);
         if (point) {
-            // TODO 直接显示第一个poi
-
-        }
-
-        if (!point) {    // point不空，显示逆地理编码结果，否则显示结果中poi
+          if (address.surroundingPois && address.surroundingPois.length != 0) {
+              // 直接显示第一个poi名称附近
+              title = address.surroundingPois[0].title + "附近";
+          }
+        } else {    // point为空则显示结果中poi
             var trans = Trans.bd09togcj02(address.point.lng, address.point.lat);
             location = new Point({
                 latitude: trans[1],
                 longitude: trans[0]
             });
+            title = address.title;
         }
+
+        // 初始化Actions
+        var newStatusAction = {
+            title: "发表状态",
+            id: "new-status",
+            className: "esri-icon-plus-circled"
+        };
+        _view.popup.clear();
+        _view.popup.actions.removeAll();
+        _view.popup.actions.push(_zoomAction);
+        _view.popup.actions.push(newStatusAction);
+        _view.popup.on("trigger-action", function (event) {
+            if (event.action.id === "new-status") {
+                showNewStatusPopup(title, address.address, location);
+            }
+        });
+
         // 采用iframe加载页面，逆地理编码结果通过参数传入 // 若直接将整个页面放入content，则页面中script无法执行
         _view.popup.open({   // popup
-            title: address.title || "位置",
+            title: title,
+            content: "<iframe id='iframe' src='" +url+ "' sandbox='allow-forms allow-popups allow-scripts allow-same-origin allow-modals' scrolling='auto' frameborder='0' width='100%' height='0'></iframe>",
+            location: location
+        });
+    }
+
+    /**
+     * 显示发表状态Popup
+     * @param title 标题，位置名称
+     * @param address 地址
+     * @param location 位置
+     */
+    function showNewStatusPopup(title, address, location) {
+        if (title === "位置") {
+            title = address;
+        }
+        var url = "/pop/new_status/" + title + "/" + address + "/" + $.toJSON(location);
+        _view.popup.clear();
+        _view.popup.actions.removeAll();
+        _view.popup.open({
+            title: title,
             content: "<iframe id='iframe' src='" +url+ "' sandbox='allow-forms allow-popups allow-scripts allow-same-origin allow-modals' scrolling='auto' frameborder='0' width='100%' height='0'></iframe>",
             location: location
         });
