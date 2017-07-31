@@ -30,6 +30,7 @@ define([
     var _map;
     var _view;
     var _locLayer;      // 定位点GraphicsLayer
+    var _statusLayer;   // 状态点GraphicsLayer
     var _zoomAction;    // Poopup默认缩放Action
 
     /**
@@ -51,6 +52,8 @@ define([
         _map.add(baseLayer);
         _locLayer = new GraphicsLayer();
         _map.add(_locLayer);
+        _statusLayer = new GraphicsLayer();
+        _map.add(_statusLayer);
 
         _view.then(function () {
             // 定位并显示
@@ -58,6 +61,7 @@ define([
             // 初始化事件
             initEvents();
             _zoomAction = _view.popup.actions.getItemAt(0);
+            drawAllStatuses();
         });
     }
 
@@ -99,6 +103,8 @@ define([
                 latitude: trans[1],
                 longitude: trans[0]
             });
+            console.info("transpt:");
+            console.dir(transPt);
             showLocation(transPt, result.accuracy, result.address);
         });
     }
@@ -158,7 +164,7 @@ define([
             }
         });
     }
-    
+
     /**
      * 显示位置到地图
      * @param point 点 ArcGIS Point
@@ -166,7 +172,7 @@ define([
      * @param attributes 定位点属性
      */
     function showLocation(point, accuracy, attributes) {
-        _locLayer.removeAll();
+        // _locLayer.removeAll();
         // 定位图标
         var locSymbol = new PictureMarkerSymbol({
             url: "/images/gps_marker.png",
@@ -211,6 +217,10 @@ define([
     function initEvents() {
         // 指针点击
         _view.on("click", function (event) {
+            if (_view.popup.visible && !_view.popup.dockEnabled) {
+                _view.popup.close();    // 非dock状态再次点击则隐藏
+                return;
+            }
             var screenPt = {
                 x: event.x,
                 y: event.y
@@ -223,7 +233,7 @@ define([
             };
             // 逆地理编码，显示popup
             reverseGeocode(transPt, function (result) {
-                showPoiPopup(result, pt);
+                showPoiPopup(result, -1, pt);
             });
         });
     }
@@ -231,24 +241,26 @@ define([
     /**
      * 显示Poi列表Popup
      * @param  address 逆地理编码结果
-     * @param  point  Popup显示点，不空则为第一次列表显示，空则为后续列表项点击显示
+     * @param  whichPoi 显示第几个poi，-1为显示当前地址
+     * @param  point  Popup显示点，为空则使用address中坐标点
      */
-    function showPoiPopup(address, point) {
+    function showPoiPopup(address, whichPoi, point) {
         var title = "位置";
         var location = point;
-        var url = "/pop/poi/" + $.toJSON(address);
-        if (point) {
-          if (address.surroundingPois && address.surroundingPois.length != 0) {
-              // 直接显示第一个poi名称附近
-              title = address.surroundingPois[0].title + "附近";
-          }
-        } else {    // point为空则显示结果中poi
-            var trans = Trans.bd09togcj02(address.point.lng, address.point.lat);
+        var url = "/pop/poi/" + $.toJSON(address) + "/" + whichPoi;
+        if (whichPoi === -1) {  // 当前地址
+            if (address.surroundingPois && address.surroundingPois.length !== 0) {
+                // 直接显示第一个poi名称附近
+                title = address.surroundingPois[0].title + "附近";
+            }
+        } else {    // 结果中poi
+            var poi = address.surroundingPois[whichPoi];
+            var trans = Trans.bd09togcj02(poi.point.lng, poi.point.lat);
             location = new Point({
                 latitude: trans[1],
                 longitude: trans[0]
             });
-            title = address.title;
+            title = poi.title;
         }
 
         // 初始化Actions
@@ -263,7 +275,7 @@ define([
         _view.popup.actions.push(newStatusAction);
         _view.popup.on("trigger-action", function (event) {
             if (event.action.id === "new-status") {
-                showNewStatusPopup(title, address.address, location);
+                showNewStatusPopup(title, address, whichPoi, location);
             }
         });
 
@@ -278,14 +290,15 @@ define([
     /**
      * 显示发表状态Popup
      * @param title 标题，位置名称
-     * @param address 地址
+     * @param address 地址，逆地理编码结果
+     * @param  whichPoi 显示第几个poi，-1为显示当前地址
      * @param location 位置
      */
-    function showNewStatusPopup(title, address, location) {
+    function showNewStatusPopup(title, address, whichPoi, location) {
         if (title === "位置") {
-            title = address;
+            title = address.address;
         }
-        var url = "/pop/new_status/" + title + "/" + address + "/" + $.toJSON(location);
+        var url = "/pop/new_status/" + title + "/" + $.toJSON(address) + "/" + whichPoi+ "/" +$.toJSON(location);
         _view.popup.clear();
         _view.popup.actions.removeAll();
         _view.popup.open({
@@ -295,8 +308,46 @@ define([
         });
     }
 
+    /**
+     * 绘制所有状态点（临时）
+     */
+    function drawAllStatuses() {
+        App.allStatuses(function (data) {
+            console.dir(data);
+            for (var i = 0; i < data.length; i++) {
+                var status = data[i];
+                var point = new Point({
+                    latitude: status.location.y,
+                    longitude: status.location.x
+                    // spatialReference: status.location.spatialReference
+                });
+                console.info("draw point");
+                console.dir(point);
+                var statSymbol = new PictureMarkerSymbol({
+                    url: "/images/marker_shadow.png",
+                    width: 50,
+                    height: 32,
+                    yoffset: 12
+                });
+                var statGraphic = new Graphic({
+                    geometry: point,
+                    symbol: statSymbol
+                });
+                _statusLayer.add(statGraphic);
+            }
+        });
+    }
+
+    /**
+     * 隐藏Popup
+     */
+    function hidePopup() {
+        _view.popup.close();
+    }
+
     return {
         init: init,
-        showPoiPopup: showPoiPopup
+        showPoiPopup: showPoiPopup,
+        hidePopup: hidePopup
     };
 });

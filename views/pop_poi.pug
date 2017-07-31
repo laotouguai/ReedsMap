@@ -15,8 +15,8 @@ html.pixel-ratio-1
         |
         link(rel="stylesheet", href="//cdn.bootcss.com/jquery-weui/1.0.1/css/jquery-weui.min.css")
     body(ontouchstart)
-        p(style="margin-bottom:0px; font-size:12px") #{address.address}
-        if address.surroundingPois
+        p(style="margin-bottom:0px; font-size:12px") #{addressStr}
+        if address.surroundingPois && whichPoi == -1
             .weui-cells
                 -var i = 0;
                 each poi in address.surroundingPois
@@ -39,6 +39,5 @@ html.pixel-ratio-1
             $(".weui-cell_access").on("click", function () {
                 // 在该poi位置弹出popup
                 var addr = !{JSON.stringify(address).replace(/<\//g, '<\\/')};  // 获取传入的address对象
-                var poi = addr.surroundingPois[this.id];
-                parent.App.showPoiPopup(poi);
+                parent.App.showPoiPopup(addr, this.id);
             });

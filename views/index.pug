@@ -2,6 +2,11 @@ doctype html
 html
     head
         title= title
+        meta(http-equiv="Content-Type", content="text/html; charset=UTF-8")
+        meta(http-equiv="X-UA-Compatible", content="IE=edge")
+        meta(name="viewport", content="width=device-width, initial-scale=1, user-scalable=no")
+        link(rel="stylesheet", href="//cdn.bootcss.com/weui/1.1.1/style/weui.min.css")
+        link(rel="stylesheet", href="//cdn.bootcss.com/jquery-weui/1.0.1/css/jquery-weui.min.css")
         link(rel='stylesheet', href='/stylesheets/style.css')
         link(rel='stylesheet', href='https://js.arcgis.com/4.3/esri/css/main.css')
         script(src='http://api.map.baidu.com/api?v=2.0&ak=9uneGsKfauNCajhKVzkdzsLMQda562EZ')
@@ -13,6 +18,7 @@ html
             };
         script(src='https://js.arcgis.com/4.3/')
         script(src='/javascripts/lib/jquery-3.2.1.js')
+        script(src='//cdn.bootcss.com/jquery-weui/1.0.1/js/jquery-weui.min.js')
         script(src='/javascripts/lib/jquery.json-2.5.1.js')
         script(src='/javascripts/main.js')
     body
